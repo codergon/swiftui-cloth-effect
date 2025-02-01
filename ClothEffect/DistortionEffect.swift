@@ -108,7 +108,7 @@ struct GridCell: View {
     let deltaX = touch.x - position.x
     let deltaY = touch.y - position.y
     let distance = hypot(deltaX, deltaY)
-    let maxDistance: CGFloat = 200
+    let maxDistance: CGFloat = 150
     let forceFactor: CGFloat = 0.7
 
     if distance < maxDistance {
@@ -117,7 +117,7 @@ struct GridCell: View {
       position.y += deltaY * strength * forceFactor
     }
 
-    let scale = min(1, max(0.1, distance / 80))
+    let scale = min(1, max(0.1, distance / maxDistance))
     currentSize *= scale
 
     return (position, currentSize)
