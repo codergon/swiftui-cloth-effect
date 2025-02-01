@@ -28,7 +28,6 @@ struct DistortionEffect: View {
       }
     }
     .background(Color.black)
-
   }
 }
 
@@ -36,63 +35,25 @@ struct CanvasView: View {
   let rows = 12
   let cols = 20
   let padding: CGFloat = 24
-  let spacing: CGFloat = 2.4
-  let cornerRadius: CGFloat = 5
+  let spacing: CGFloat = 3
+  let cornerRadius: CGFloat = 4
   @Binding var touchLocation: CGPoint?
 
   var body: some View {
     GeometryReader { geometry in
-      Canvas { context, size in
-
-        let maxDistance: CGFloat = 180
-        let forceFactor: CGFloat = 0.7
-
-        for row in 0..<rows {
-          for col in 0..<cols {
-            let circleSize: CGFloat = {
-              ((geometry.size.width - (padding * 2)) - (spacing * (CGFloat(cols) - 1)))
-                / CGFloat(cols)
-            }()
-
-            let initialX = (CGFloat(col) * (circleSize + spacing) + circleSize / 2) + padding
-            let initialY =
-              CGFloat(row) * (circleSize + spacing) + circleSize / 2
-              + (geometry.size.height - gridHeight(circleSize: circleSize)) / 2
-
-            var currentX = initialX
-            var currentY = initialY
-            var currentSize = circleSize
-
-            if let touch = touchLocation {
-              let deltaX = touch.x - initialX
-              let deltaY = touch.y - initialY
-              let distance = hypot(deltaX, deltaY)
-
-              if distance < maxDistance {
-                let strength = pow(1 - (distance / maxDistance), spacing)
-                let displacementX = deltaX * strength * forceFactor
-                let displacementY = deltaY * strength * forceFactor
-
-                currentX += displacementX
-                currentY += displacementY
-              }
-
-              // Size scaling (0.2 to 1.0 based on distance)
-              let scale = min(1, max(0.2, distance / 80))
-              currentSize *= scale
-
-            }
-
-            let rect = CGRect(
-              x: currentX - circleSize / 2,
-              y: currentY - circleSize / 2,
-              width: currentSize,
-              height: currentSize
-            )
-
-            context.fill(
-              Path(roundedRect: rect, cornerRadius: cornerRadius),
-              with: .color(.gray)
+      ZStack {
+        ForEach(0..<rows, id: \.self) { row in
+          ForEach(0..<cols, id: \.self) { col in
+            GridCell(
+              row: row,
+              col: col,
+              rows: rows,
+              cols: cols,
+              padding: padding,
+              spacing: spacing,
+              cornerRadius: cornerRadius,
+              size: geometry.size,
+              touchLocation: $touchLocation
             )
           }
         }
@@ -100,17 +61,75 @@ struct CanvasView: View {
       .gesture(
         DragGesture(minimumDistance: 0)
           .onChanged { value in
-            touchLocation = value.location
+            withAnimation(.easeOut(duration: 0.6)) {
+              touchLocation = value.location
+            }
           }
           .onEnded { _ in
-            touchLocation = nil
+            withAnimation(.easeOut(duration: 0.8)) {
+              touchLocation = nil
+            }
           }
       )
     }
   }
+}
 
-  private func gridHeight(circleSize: CGFloat) -> CGFloat {
-    (CGFloat(rows) * (circleSize + spacing)) - spacing
+struct GridCell: View {
+  let row: Int
+  let col: Int
+  let rows: Int
+  let cols: Int
+  let padding: CGFloat
+  let spacing: CGFloat
+  let cornerRadius: CGFloat
+  let size: CGSize
+  @Binding var touchLocation: CGPoint?
+
+  private var circleSize: CGFloat {
+    ((size.width - (padding * 2)) - (spacing * (CGFloat(cols) - 1))) / CGFloat(cols)
+  }
+
+  private var initialPosition: CGPoint {
+    let x = (CGFloat(col) * (circleSize + spacing) + circleSize / 2) + padding
+    let gridHeight = (CGFloat(rows) * (circleSize + spacing)) - spacing
+    let y = CGFloat(row) * (circleSize + spacing) + circleSize / 2 + (size.height - gridHeight) / 2
+    return CGPoint(x: x, y: y)
+  }
+
+  private var currentPosition: (CGPoint, CGFloat) {
+    var position = initialPosition
+    var currentSize = circleSize
+
+    guard let touch = touchLocation else {
+      return (position, currentSize)
+    }
+
+    let deltaX = touch.x - position.x
+    let deltaY = touch.y - position.y
+    let distance = hypot(deltaX, deltaY)
+    let maxDistance: CGFloat = 200
+    let forceFactor: CGFloat = 0.7
+
+    if distance < maxDistance {
+      let strength = pow(1 - (distance / maxDistance), spacing)
+      position.x += deltaX * strength * forceFactor
+      position.y += deltaY * strength * forceFactor
+    }
+
+    let scale = min(1, max(0.1, distance / 80))
+    currentSize *= scale
+
+    return (position, currentSize)
+  }
+
+  var body: some View {
+    let (position, size) = currentPosition
+
+    RoundedRectangle(cornerRadius: cornerRadius)
+      .fill(Color.gray)
+      .frame(width: size, height: size)
+      .position(position)
   }
 }
 
